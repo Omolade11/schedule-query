@@ -1,0 +1,140 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "sts:AssumeRole"
+            ],
+            "Principal": {
+                "Service": [
+                    "redshift.amazonaws.com"
+                ]
+            }
+        }
+    ]
+}
+
+s3 full access
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:*",
+                "s3-object-lambda:*"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+power user access
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "NotAction": [
+                "iam:*",
+                "organizations:*",
+                "account:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateServiceLinkedRole",
+                "iam:DeleteServiceLinkedRole",
+                "iam:ListRoles",
+                "organizations:DescribeOrganization",
+                "account:ListRegions"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+arn:aws:iam::509802029116:role/lade
+
+
+create external schema s3dataschema
+from data catalog
+database 'dev'
+iam_role 'arn:aws:iam::509802029116:role/lade'
+create external database if not exists;
+
+copy event from 's3://s33333333333/allevents_pipe.txt' 
+iam_role 'arn:aws:iam::509802029116:role/lade'
+delimiter '|' timeformat 'YYYY-MM-DD HH:MI:SS' region 'us-east-1';
+
+
+copy event from 's3://s33333333333/allevents_pipe.txt' 
+iam_role 'arn:aws:iam::509802029116:role/lade'
+delimiter '|' timeformat 'YYYY-MM-DD HH:MI:SS' region 'us-east-1';
+
+select * from date
+
+arn:aws:iam::338550176633:role/lade
+377582181475
+s3://buckett99546/allevents_pipe.txt
+s3://buckett99546/allevents_pipe.txt
+
+arn:aws:iam::377582181475:role/redshift
+
+arn:aws:iam::377582181475:role/lade ...schedule
+
+copy event from s3://buckett99546/allevents_pipe.txt select * from date;
+
+
+
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CloudFormation template for EventBridge rule 'to-schedule-query'",
+  "Resources": {
+    "EventRule0": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "schedule query in redshift",
+        "EventBusName": "default",
+        "Name": "to-schedule-query",
+        "ScheduleExpression": "cron(0/5 * ? * MON-FRI *)",
+        "State": "ENABLED",
+        "Targets": [{
+          "Id": "to-schedule-query",
+          "Arn": "arn:aws:redshift:us-east-1:377582181475:cluster:tf-redshift-cluster",
+          "RoleArn": "arn:aws:iam::377582181475:role/schedule_query",
+          "RedshiftDataParameters": {
+            "Database": "mydb",
+            "DbUser": "exampleuser",
+            "Sql": "copy event from s3://buckett99546/allevents_pipe.txt;\n  select * from date;",
+            "StatementName": "refresh-schedule",
+            "WithEvent": true
+          }
+        }]
+      }
+    }
+  }
+}
+
+
+[aws_iam_role.schedule_query_role.arn]..schedule
+aws_iam_role.schedule_query_role.arn
+
+
+variable "schedule_expression" {
+  type    = list
+  default = ["cron(0/1 * ? * MON-FRI *)", "cron(0/10 * ? * MON-FRI *)", "cron(0/30 * ? * MON-FRI *)"]
+}
+
+variable "sql" {
+  type = list
+  default = ["select * from event;", "CREATE TABLE Persons (FirstName varchar(255))\n INSERT INTO Persons (FirstName) VALUES ("XR");", "CREATE DATABASE testdata;"] 
+}
+
+
+INSERT INTO Persons (FirstName) VALUES ("XR")

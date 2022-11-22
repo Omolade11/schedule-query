@@ -1,0 +1,270 @@
+provider "aws" {
+  region = "us-east-1"
+}
+
+
+
+resource "aws_iam_role_policy" "test_policy" {
+  name = "test_policy"
+  role = aws_iam_role.test_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        "Sid" : "EventBridgeActions",
+        "Effect" : "Allow",
+        "Action" : [
+          "events:*",
+          "schemas:*",
+          "scheduler:*"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "IAMCreateServiceLinkedRoleForApiDestinations",
+        "Effect" : "Allow",
+        "Action" : "iam:CreateServiceLinkedRole",
+        "Resource" : "arn:aws:iam::*:role/aws-service-role/AmazonEventBridgeApiDestinationsServiceRolePolicy",
+        "Condition" : {
+          "StringEquals" : {
+            "iam:AWSServiceName" : "apidestinations.events.amazonaws.com"
+          }
+        }
+      },
+      {
+        "Sid" : "IAMCreateServiceLinkedRoleForAmazonEventBridgeSchemas",
+        "Effect" : "Allow",
+        "Action" : "iam:CreateServiceLinkedRole",
+        "Resource" : "arn:aws:iam::*:role/aws-service-role/schemas.amazonaws.com/AWSServiceRoleForSchemas",
+        "Condition" : {
+          "StringEquals" : {
+            "iam:AWSServiceName" : "schemas.amazonaws.com"
+          }
+        }
+      },
+      {
+        "Sid" : "SecretsManagerAccessForApiDestinations",
+        "Effect" : "Allow",
+        "Action" : [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:PutSecretValue"
+        ],
+        "Resource" : "arn:aws:secretsmanager:*:*:secret:events!*"
+      },
+      {
+        "Sid" : "IAMPassRoleAccessForEventBridge",
+        "Effect" : "Allow",
+        "Action" : "iam:PassRole",
+        "Resource" : "arn:aws:iam::*:role/*",
+        "Condition" : {
+          "StringLike" : {
+            "iam:PassedToService" : "events.amazonaws.com"
+          }
+        }
+      },
+      {
+        "Sid" : "IAMPassRoleAccessForScheduler",
+        "Effect" : "Allow",
+        "Action" : "iam:PassRole",
+        "Resource" : "arn:aws:iam::*:role/*",
+        "Condition" : {
+          "StringLike" : {
+            "iam:PassedToService" : "scheduler.amazonaws.com"
+          }
+        }
+      },
+      {
+        "Sid" : "DataAPIPermissions",
+        "Effect" : "Allow",
+        "Action" : [
+          "redshift-data:BatchExecuteStatement",
+          "redshift-data:ExecuteStatement",
+          "redshift-data:CancelStatement",
+          "redshift-data:ListStatements",
+          "redshift-data:GetStatementResult",
+          "redshift-data:DescribeStatement",
+          "redshift-data:ListDatabases",
+          "redshift-data:ListSchemas",
+          "redshift-data:ListTables",
+          "redshift-data:DescribeTable"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "SecretsManagerPermissions",
+        "Effect" : "Allow",
+        "Action" : [
+          "secretsmanager:GetSecretValue"
+        ],
+        "Resource" : "*",
+        "Condition" : {
+          "StringLike" : {
+            "secretsmanager:ResourceTag/RedshiftDataFullAccess" : "*"
+          }
+        }
+      },
+      {
+        "Sid" : "GetCredentialsForAPIUser",
+        "Effect" : "Allow",
+        "Action" : "redshift:GetClusterCredentials",
+        "Resource" : [
+          "arn:aws:redshift:*:*:dbname:*/*",
+          "arn:aws:redshift:*:*:dbuser:*/redshift_data_api_user"
+        ]
+      },
+      {
+        "Sid" : "GetCredentialsForServerless",
+        "Effect" : "Allow",
+        "Action" : "redshift-serverless:GetCredentials",
+        "Resource" : "*",
+        "Condition" : {
+          "StringLike" : {
+            "aws:ResourceTag/RedshiftDataFullAccess" : "*"
+          }
+        }
+      },
+      {
+        "Sid" : "DenyCreateAPIUser",
+        "Effect" : "Deny",
+        "Action" : "redshift:CreateClusterUser",
+        "Resource" : [
+          "arn:aws:redshift:*:*:dbuser:*/redshift_data_api_user"
+        ]
+      },
+      {
+        "Sid" : "ServiceLinkedRole",
+        "Effect" : "Allow",
+        "Action" : "iam:CreateServiceLinkedRole",
+        "Resource" : "arn:aws:iam::*:role/aws-service-role/redshift-data.amazonaws.com/AWSServiceRoleForRedshift",
+        "Condition" : {
+          "StringLike" : {
+            "iam:AWSServiceName" : "redshift-data.amazonaws.com"
+          }
+        }
+      },
+      {
+        "Action" : [
+          "redshift:*",
+          "redshift-serverless:*",
+          "ec2:DescribeAccountAttributes",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeInternetGateways",
+          "sns:CreateTopic",
+          "sns:Get*",
+          "sns:List*",
+          "cloudwatch:Describe*",
+          "cloudwatch:Get*",
+          "cloudwatch:List*",
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:EnableAlarmActions",
+          "cloudwatch:DisableAlarmActions",
+          "tag:GetResources",
+          "tag:UntagResources",
+          "tag:GetTagValues",
+          "tag:GetTagKeys",
+          "tag:TagResources"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "*"
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : "iam:CreateServiceLinkedRole",
+        "Resource" : "arn:aws:iam::*:role/aws-service-role/redshift.amazonaws.com/AWSServiceRoleForRedshift",
+        "Condition" : {
+          "StringLike" : {
+            "iam:AWSServiceName" : "redshift.amazonaws.com"
+          }
+        }
+      },
+      {
+        "Sid" : "DataAPIPermissions",
+        "Action" : [
+          "redshift-data:ExecuteStatement",
+          "redshift-data:CancelStatement",
+          "redshift-data:ListStatements",
+          "redshift-data:GetStatementResult",
+          "redshift-data:DescribeStatement",
+          "redshift-data:ListDatabases",
+          "redshift-data:ListSchemas",
+          "redshift-data:ListTables",
+          "redshift-data:DescribeTable"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "SecretsManagerListPermissions",
+        "Action" : [
+          "secretsmanager:ListSecrets"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "SecretsManagerCreateGetPermissions",
+        "Action" : [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:TagResource"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "*",
+        "Condition" : {
+          "StringLike" : {
+            "secretsmanager:ResourceTag/RedshiftDataFullAccess" : "*"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "test_role" {
+  name = "test_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "events.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+
+  event_pattern = <<EOF
+{
+"Rule": ["to-schedule-query"],
+"EventBusName": ["default"],
+"Targets": 
+[
+{
+"Id": "to-schedule-query",
+"Arn": "arn:aws:redshift:us-east-1:377582181475:cluster:tf-redshift-cluster" ,
+"RoleArn": "arn:aws:iam::377582181475:role/schedule_query",
+"RedshiftDataParameters": 
+{
+"master_password": "Omolade11*",
+"Database": "mydb",
+"Sql": "REFRESH MATERIALIZED VIEW to-schedule-query;",
+"StatementName": "refresh-schedule",
+"WithEvent": true
+}
+}
+]
+}
+EOF
+}
