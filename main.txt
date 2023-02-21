@@ -268,3 +268,107 @@ resource "aws_iam_role" "test_role" {
 }
 EOF
 }
+
+
+variable "vpcs" {
+  type = map(object({
+    cidr_block = string
+  }))
+}
+
+resource "aws_vpc" "example" {
+  # One VPC for each element of var.vpcs
+  for_each = var.vpcs
+
+  # each.value here is a value from var.vpcs
+  cidr_block = each.value.cidr_block
+}
+
+resource "aws_internet_gateway" "example" {
+  # One Internet Gateway per VPC
+  for_each = aws_vpc.example
+
+  # each.value here is a full aws_vpc object
+  vpc_id = each.value.id
+}
+
+output "vpc_ids" {
+  value = {
+    for k, v in aws_vpc.example : k => v.id
+  }
+
+  # The VPCs aren't fully functional until their
+  # internet gateways are running.
+  depends_on = [aws_internet_gateway.example]
+}
+
+
+resource "aws_cloudwatch_event_bus" "messenger" {
+  name = "chat-messages"
+}
+
+
+variable "schedule_expression" {
+  type    = list
+  default = ["cron(0/1 * ? * MON-FRI *)", "cron(0/10 * ? * MON-FRI *)", "cron(0/30 * ? * MON-FRI *)"]
+}
+
+variable "sql" {
+  type = list
+  default = ["select * from event;", "CREATE TABLE Persons (FirstName varchar(255))\n INSERT INTO Persons (FirstName) VALUES ("XR");", "CREATE DATABASE testdata;"] 
+}
+
+resource "aws_cloudwatch_event_rule" "trial" {
+  count    = length(var.schedule_expression)
+  name                = var.schedule_expression[count.index]
+  description         = "schedule query in redshift"
+  schedule_expression = split(",", var.schedule_expression)
+}
+
+resource "aws_cloudwatch_event_target" "to_schedule_query" {
+  count    = length(var.sql)
+  target_id = "to-schedule-query"
+  arn       = aws_redshift_cluster.cluster.arn
+  rule      = aws_cloudwatch_event_rule.trial.name[count.index]
+  role_arn  = "arn:aws:iam::377582181475:role/lade"
+  depends_on = [aws_iam_role.schedule_query_role, aws_cloudwatch_event_rule.trial[count.index], aws_redshift_cluster.cluster]
+  redshift_target{
+    database = "mydb"
+    db_user = "exampleuser"
+    sql = split(",", var.sql)
+    statement_name = "refresh-schedule"
+    with_event = true
+
+  }
+
+}
+
+
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CloudFormation template for EventBridge rule 'to-schedule-query'",
+  "Resources": {
+    "EventRule0": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "schedule query in redshift",
+        "EventBusName": "default",
+        "Name": "to-schedule-query",
+        "ScheduleExpression": "cron(0/1 * ? * MON-FRI *)",
+        "State": "ENABLED",
+        "Targets": [{
+          "Id": "to-schedule-query",
+          "Arn": "arn:aws:redshift:us-east-1:377582181475:cluster:tf-redshift-cluster",
+          "RoleArn": "arn:aws:iam::377582181475:role/schedule_query",
+          "RedshiftDataParameters": {
+            "Database": "mydb",
+            "DbUser": "exampleuser",
+            "Sql": "select * from event;",
+            "StatementName": "refresh-schedule",
+            "WithEvent": true
+          }
+        }]
+      }
+    }
+  }
+}

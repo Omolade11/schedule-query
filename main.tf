@@ -21,7 +21,7 @@ data "aws_iam_policy_document" "assume_role" {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::377582181475:user/cloudformation"]
+      identifiers = ["arn:aws:iam::377582181475:user/redshift-trial"]
     }
   }
 }
@@ -423,41 +423,31 @@ resource "aws_redshift_cluster" "cluster" {
   master_password    = "Omolade11*"
   node_type          = "dc2.large"
   cluster_type       = "single-node"
-  iam_roles          = ["arn:aws:iam::377582181475:role/lade"]
+  iam_roles          = [aws_iam_role.schedule_query_role.arn]
   depends_on         = [aws_iam_role.schedule_query_role]
-}
+  skip_final_snapshot = true
 
-
-
-locals {
-  queries = {
-    "qu1" = { cron = "cron(0/1 * ? * MON-FRI *)", sql = "select * from event;" },
-    "qu2" = { cron = "cron(0/10 * ? * MON-FRI *)", sql = "CREATE TABLE Persons (FirstName varchar(255));" },
-    "qu3" = { cron = "cron(0/30 * ? * MON-FRI *)", sql = "CREATE DATABASE testdata;" }
-  }
 }
 
 
 resource "aws_cloudwatch_event_rule" "trial" {
-  for_each            = local.queries
   name                = "to-schedule-query"
   description         = "schedule query in redshift"
-  schedule_expression = each.value.cron
+  schedule_expression = "cron(0/1 * ? * MON-FRI *)"
 }
 
 resource "aws_cloudwatch_event_target" "to_schedule_query" {
-  target_id  = "to-schedule-query"
-  arn        = aws_redshift_cluster.cluster.arn
-  rule       = each.key
-  role_arn   = "arn:aws:iam::377582181475:role/lade"
+  target_id = "to-schedule-query"
+  arn       = aws_redshift_cluster.cluster.arn
+  rule      = aws_cloudwatch_event_rule.trial.name
+  role_arn  = aws_iam_role.schedule_query_role.arn
   depends_on = [aws_iam_role.schedule_query_role, aws_cloudwatch_event_rule.trial, aws_redshift_cluster.cluster]
-  for_each   = local.queries
-  redshift_target {
-    database       = "mydb"
-    db_user        = "exampleuser"
-    sql            = each.value.sql
+  redshift_target{
+    database = "mydb"
+    db_user = "exampleuser"
+    sql = "select * from event;"
     statement_name = "refresh-schedule"
-    with_event     = true
+    with_event = true
 
   }
 

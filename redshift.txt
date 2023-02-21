@@ -138,3 +138,104 @@ variable "sql" {
 
 
 INSERT INTO Persons (FirstName) VALUES ("XR")
+
+
+variable "schedule_expression" {
+  type = string
+}
+
+variable "sql" {
+  type = string
+}
+
+///it was used with for each
+resource "aws_cloudwatch_event_target" "to_schedule_query" {
+  target_id  = "to-schedule-query"
+  arn        = aws_redshift_cluster.cluster.arn
+  rule       = each.key
+  role_arn   = "arn:aws:iam::377582181475:role/lade"
+  depends_on = [aws_iam_role.schedule_query_role, aws_cloudwatch_event_rule.trial, aws_redshift_cluster.cluster]
+  for_each   = local.queries
+  redshift_target {
+    database       = "mydb"
+    db_user        = "exampleuser"
+    sql            = each.value.sql
+    statement_name = "refresh-schedule"
+    with_event     = true
+
+  }
+
+}
+
+
+
+
+
+locals {
+  queries = {
+    "qu1" = { cron = "cron(0/1 * ? * MON-FRI *)", sql = "select * from event;" },
+    "qu2" = { cron = "cron(0/10 * ? * MON-FRI *)", sql = "CREATE TABLE Persons (FirstName varchar(255));" },
+    "qu3" = { cron = "cron(0/30 * ? * MON-FRI *)", sql = "CREATE DATABASE testdata;" }
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "trial" {
+  for_each            = local.queries
+  name                = "to-schedule-query"
+  description         = "schedule query in redshift"
+  schedule_expression = each.value.cron
+}
+
+
+resource "aws_cloudwatch_event_target" "to_schedule_query" {
+  target_id  = var.target_id[count.index]
+  arn        = aws_redshift_cluster.cluster.arn
+  rule       = aws_cloudwatch_event_rule.trial.name[count.index]
+  role_arn   = "arn:aws:iam::377582181475:role/lade"
+  depends_on = [aws_iam_role.schedule_query_role, aws_redshift_cluster.cluster]
+  redshift_target {
+    database       = "mydb"
+    db_user        = "exampleuser"
+    sql            = local.sql[count.index]
+    statement_name = "refresh-schedule"
+    with_event     = true
+
+  }
+  count =  length(local.queries.qu1.sql)
+
+}
+
+
+
+
+
+
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CloudFormation template for EventBridge rule 'QS-tf-redshift-cluster-console'",
+  "Resources": {
+    "EventRule0": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "EventBusName": "default",
+        "Name": "QS-tf-redshift-cluster-console",
+        "ScheduleExpression": "cron(0/1 * ? * MON,TUE,WED,THU,FRI,SAT,SUN *)",
+        "State": "ENABLED",
+        "Targets": [{
+          "Id": "QS-tf-redshift-cluster-console",
+          "Arn": "arn:aws:redshift:us-east-1:377582181475:cluster:tf-redshift-cluster",
+          "RoleArn": "arn:aws:iam::377582181475:role/schedule_query",
+          "RedshiftDataParameters": {
+            "Database": "mydb",
+            "DbUser": "exampleuser",
+            "Sql": "select * from date",
+            "StatementName": "QS-tf-redshift-cluster-console",
+            "WithEvent": true
+          }
+        }]
+      }
+    }
+  }
+}
+
+
